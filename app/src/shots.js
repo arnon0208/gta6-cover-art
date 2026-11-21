@@ -1,59 +1,46 @@
-// Vice Cover Studio — deterministic screenshot mode.
-// ?shot=cover renders just the finished cover, full-bleed, for the cover
-// screenshot. ?shot=editor shows the editor with a photo loaded.
-// Query params: photo (boulevard|neon|pier), caption, sub, grade, layout,
-// size (1080x1080|1080x1350|1920x1080). Sets window.__shotReady when drawn.
-
-export function applyShotMode(state, hooks) {
-  const params = new URLSearchParams(location.search);
-  const shot = params.get("shot");
-  if (!shot) return false;
-
-  const photo = params.get("photo") || "pier";
-  const caption = params.get("caption");
-  const sub = params.get("sub");
-  const grade = params.get("grade");
-  const layout = params.get("layout");
-  const size = params.get("size");
-
-  if (caption !== null) {
-    state.caption = caption;
-    document.getElementById("caption").value = caption;
-  }
-  if (sub !== null) {
-    state.subcaption = sub;
-    document.getElementById("subcaption").value = sub;
-  }
-  if (grade && ["sunset", "neon", "golden", "noir"].includes(grade)) {
-    state.grade = grade;
-    document.getElementById("grade").value = grade;
-  }
-  if (layout && ["solo", "duo", "trio", "quad"].includes(layout)) {
-    state.layout = layout;
-    document.querySelectorAll("#layouts button").forEach((b) =>
-      b.classList.toggle("active", b.dataset.layout === layout));
-  }
-  if (size && ["1080x1080", "1080x1350", "1920x1080"].includes(size)) {
-    state.size = size;
-    document.getElementById("size").value = size;
-  }
-
-  const finish = () => {
-    hooks.render();
-    window.__shotReady = true;
-  };
-
-  hooks.loadSamples().then(() => {
-    // the named photo fills every panel of the cover shot; the editor shot
-    // keeps the default trio arrangement
-    if (shot === "cover") {
-      const idx = state.photos.findIndex((p) => p.name === photo);
-      const fill = idx >= 0 ? idx : 0;
-      for (const panel of state.panels) panel.photo = fill;
-      document.body.classList.add("shot-cover");
-    }
-    document.fonts.ready.then(finish);
-  });
-
-  return true;
-}
+// Shot presets for screenshots: deterministic editor states the maker captures.
+// ?shot=cover  — trio cover "SUNSET RUN" (the first screenshot, the cover).
+// ?shot=editor — the editor with a photo loaded, trio "BOULEVARD QUEEN".
+// ?shot=quad   — quad neon cover "MIDNIGHT IN NEON BAY".
+export const SHOTS = {
+  cover(state) {
+    state.layout = 'trio';
+    state.caption = 'SUNSET RUN';
+    state.subcaption = 'NEON BAY';
+    state.grade = 'sunset';
+    state.size = '1080x1080';
+    state.panels = [
+      { photo: 0, x: 0, y: 0, zoom: 1.15 },
+      { photo: 1, x: 0, y: 0, zoom: 1.1 },
+      { photo: 2, x: 0, y: -70, zoom: 1.35 },
+    ];
+    state.active = 0;
+  },
+  editor(state) {
+    state.layout = 'trio';
+    state.caption = 'BOULEVARD QUEEN';
+    state.subcaption = 'VICE CITY NIGHTS';
+    state.grade = 'golden';
+    state.size = '1080x1080';
+    state.panels = [
+      { photo: 0, x: -40, y: 0, zoom: 1.2 },
+      { photo: 2, x: 0, y: 0, zoom: 1 },
+      { photo: 1, x: 30, y: 0, zoom: 1.1 },
+    ];
+    state.active = 1;
+  },
+  quad(state) {
+    state.layout = 'quad';
+    state.caption = 'MIDNIGHT IN NEON BAY';
+    state.subcaption = 'FOUR CORNERS';
+    state.grade = 'neon';
+    state.size = '1080x1080';
+    state.panels = [
+      { photo: 1, x: 0, y: 0, zoom: 1.1 },
+      { photo: 0, x: 0, y: 0, zoom: 1 },
+      { photo: 2, x: 0, y: -50, zoom: 1.3 },
+      { photo: 1, x: -30, y: 0, zoom: 1.25 },
+    ];
+    state.active = 0;
+  },
+};
