@@ -1,32 +1,59 @@
-// Fixed scenes for screenshots: ?shot=editor shows the app with a sample photo
-// loaded; ?shot=cover shows the cover alone; ?shot=cover2 shows a second cover
-// (neon grade, four panels). `photo` picks the sample, `caption` the words,
-// `sub` the sub-caption. window.__shotReady is set once painted and the font
-// is loaded.
-export async function runShot(shot, query, api) {
-  const photo = query.get('photo') ?? 'pier';
-  const caption = query.get('caption') ?? 'Neon Bay Nights';
-  const sub = query.get('sub') ?? 'A story in four frames';
-  if (shot === 'cover' || shot === 'cover2') {
-    document.body.classList.add('shot-cover');
+// Vice Cover Studio — deterministic screenshot mode.
+// ?shot=cover renders just the finished cover, full-bleed, for the cover
+// screenshot. ?shot=editor shows the editor with a photo loaded.
+// Query params: photo (boulevard|neon|pier), caption, sub, grade, layout,
+// size (1080x1080|1080x1350|1920x1080). Sets window.__shotReady when drawn.
+
+export function applyShotMode(state, hooks) {
+  const params = new URLSearchParams(location.search);
+  const shot = params.get("shot");
+  if (!shot) return false;
+
+  const photo = params.get("photo") || "pier";
+  const caption = params.get("caption");
+  const sub = params.get("sub");
+  const grade = params.get("grade");
+  const layout = params.get("layout");
+  const size = params.get("size");
+
+  if (caption !== null) {
+    state.caption = caption;
+    document.getElementById("caption").value = caption;
   }
-  if (shot === 'cover2') {
-    // load all three samples into a four-panel cover
-    for (const sample of ['neon', 'boulevard', 'pier']) {
-      const img = await api.loadImage(`samples/${sample}.jpg`);
-      api.state.photos.push({ img, name: `${sample}.jpg`, zoom: 1, ox: 0, oy: 0 });
-    }
-    api.state.photos.push({ img: api.state.photos[0].img, name: 'neon.jpg', zoom: 1.15, ox: 0.05, oy: 0 });
-    await api.apply(null, 'Midnight In Neon Bay', 'Four frames. One city.', 'quad', 'neon', '1080x1350');
-  } else {
-    await api.apply(photo, caption, sub, shot === 'cover' ? 'solo' : undefined, shot === 'cover' ? 'sunset' : undefined, shot === 'cover' ? '1080x1080' : undefined);
+  if (sub !== null) {
+    state.subcaption = sub;
+    document.getElementById("subcaption").value = sub;
   }
-  try {
-    await document.fonts.ready;
-  } catch {
-    // fonts are a progressive enhancement; the fallback still paints
+  if (grade && ["sunset", "neon", "golden", "noir"].includes(grade)) {
+    state.grade = grade;
+    document.getElementById("grade").value = grade;
   }
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  if (layout && ["solo", "duo", "trio", "quad"].includes(layout)) {
+    state.layout = layout;
+    document.querySelectorAll("#layouts button").forEach((b) =>
+      b.classList.toggle("active", b.dataset.layout === layout));
+  }
+  if (size && ["1080x1080", "1080x1350", "1920x1080"].includes(size)) {
+    state.size = size;
+    document.getElementById("size").value = size;
+  }
+
+  const finish = () => {
+    hooks.render();
     window.__shotReady = true;
-  }));
+  };
+
+  hooks.loadSamples().then(() => {
+    // the named photo fills every panel of the cover shot; the editor shot
+    // keeps the default trio arrangement
+    if (shot === "cover") {
+      const idx = state.photos.findIndex((p) => p.name === photo);
+      const fill = idx >= 0 ? idx : 0;
+      for (const panel of state.panels) panel.photo = fill;
+      document.body.classList.add("shot-cover");
+    }
+    document.fonts.ready.then(finish);
+  });
+
+  return true;
 }
